@@ -45,7 +45,11 @@ export const TacticalChat: React.FC = () => {
 
       let fullText = '';
       
-      await streamStrategyChat(history, userMsg.text, useThinking, useSearch, (chunk, grounding) => {
+      const systemInstruction = `You are Klutch Vision PRO, an Omni-Lingual Gaming Superintelligence.
+      Identity: Elite, Tactical, "Cyberpunk", Precise.
+      Style: ${conversationStyle}`;
+
+      await streamStrategyChat(history, userMsg.text, useThinking, useSearch, systemInstruction, (chunk, grounding) => {
         fullText += chunk;
         setMessages(prev => {
           const newArr = [...prev];

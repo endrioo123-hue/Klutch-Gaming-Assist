@@ -5,13 +5,14 @@ export enum AppMode {
   TACTICAL_CHAT = 'TACTICAL_CHAT',
   LIVE_COMMS = 'LIVE_COMMS',
   ASSET_FORGE = 'ASSET_FORGE',
-  AVATAR_CREATOR = 'AVATAR_CREATOR',
   GAME_RECOMMENDER = 'GAME_RECOMMENDER',
   THEORY_CRAFT = 'THEORY_CRAFT',
   NEXUS_VISION = 'NEXUS_VISION',
   OVERLAY_MODE = 'OVERLAY_MODE',
   PROFILE_HUB = 'PROFILE_HUB',
-  SETTINGS = 'SETTINGS'
+  SETTINGS = 'SETTINGS',
+  WAIFU_HUB = 'WAIFU_HUB', // New Module
+  STREAM_OPS = 'STREAM_OPS'
 }
 
 export interface Message {
@@ -40,6 +41,36 @@ export interface GameRecommendation {
   reason: string;
 }
 
+// --- NEW WAIFU / COMPANION TYPES ---
+export interface Waifu {
+  id: string;
+  name: string;
+  personality: string; // Describes how she talks/acts
+  voiceId: string; // For Gemini Live Config
+  avatarUrl: string;
+  level: number;
+  intimacy: number; // 0 - 1000
+  traits: string[]; // e.g., "Tsundere", "Tactical", "Sweet"
+}
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  cost: number;
+  effect: number; // Intimacy gain
+  icon: string;
+  description: string;
+}
+
+export interface GlobalRankUser {
+  rank: number;
+  username: string;
+  xp: number;
+  waifuName: string;
+}
+
+// --- EXISTING TYPES UPDATED ---
+
 export interface AvatarTraits {
   gender: string;
   race: string;
@@ -59,6 +90,21 @@ export interface UserStats {
   losses: number;
   hoursPlayed: number;
   gamesAnalyzed: number;
+  kdRatio: number;
+  headshotPct: number;
+  accuracy: number;
+}
+
+export interface VoiceCommand {
+  id: string;
+  action: 'SCREENSHOT' | 'MUTE' | 'ASK_AI' | 'MARK_CLIP';
+  phrase: string;
+  enabled: boolean;
+}
+
+export interface VoiceConfig {
+  sensitivity: number;
+  commands: VoiceCommand[];
 }
 
 export interface UserCustomization {
@@ -74,7 +120,12 @@ export interface UserProfile {
   xp: number;
   credits: number;
   stats: UserStats;
+  voiceSettings: VoiceConfig;
   customization: UserCustomization;
   rankTitle: string;
   joinedAt: string;
+  // New Fields
+  activeWaifuId?: string;
+  waifus: Waifu[];
+  globalRank?: number;
 }
