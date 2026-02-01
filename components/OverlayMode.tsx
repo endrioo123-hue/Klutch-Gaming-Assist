@@ -26,12 +26,13 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<any>(null);
   const isSessionActiveRef = useRef(false);
-  const detectedGameRef = useRef("SCANNING..."); // Ref to track game inside loop
+  const detectedGameRef = useRef("SCANNING..."); 
   
   // Logic Loop Refs
   const rafIdRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
   const lastGameCheckTimeRef = useRef<number>(0);
+  const isDetectingRef = useRef(false); // Concurrency Lock
   
   // Audio Refs
   const inputCtxRef = useRef<AudioContext | null>(null);
@@ -70,42 +71,59 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
     return buffer;
   };
 
+  // --- RECONNECTION LOGIC ---
+  useEffect(() => {
+    let reconnectTimer: any;
+    if (status === 'RECONNECTING') {
+      setHudMessage("CONNECTION LOST. RETRYING...");
+      reconnectTimer = setTimeout(() => {
+        startOverlaySession(true); // True = Reconnect mode (skip mic request if possible or re-use)
+      }, 3000);
+    }
+    return () => clearTimeout(reconnectTimer);
+  }, [status]);
+
   // --- MAIN INITIALIZATION ---
-  const startOverlaySession = async () => {
+  const startOverlaySession = async (isReconnect = false) => {
     try {
-      setStatus('INITIALIZING');
-      setHudMessage("REQUESTING NEURAL HANDSHAKE...");
+      if (!isReconnect) setStatus('INITIALIZING');
+      setHudMessage(isReconnect ? "RE-ESTABLISHING UPLINK..." : "REQUESTING NEURAL HANDSHAKE...");
 
-      // 1. GET SCREEN SHARE (Video Only)
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { width: { max: 1280 }, height: { max: 720 }, frameRate: { max: 30 } },
-        audio: false 
-      });
-
-      screenStream.getVideoTracks()[0].onended = () => handleExit();
-
-      // 2. GET MICROPHONE
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true }
-      });
-
-      // 3. SETUP HIDDEN VIDEO
-      if (videoRef.current) {
-        videoRef.current.srcObject = screenStream;
-        await videoRef.current.play();
+      // 1. GET SCREEN SHARE (Video Only) - Only if not already active
+      if (!videoRef.current?.srcObject) {
+         const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { max: 1280 }, height: { max: 720 }, frameRate: { max: 30 } },
+          audio: false 
+        });
+        screenStream.getVideoTracks()[0].onended = () => handleExit();
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = screenStream;
+          await videoRef.current.play();
+        }
       }
 
-      // 4. SETUP AUDIO CONTEXTS
-      inputCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      outputCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      // 2. GET MICROPHONE - Only if not already setup
+      let micStream: MediaStream;
+      if (!inputCtxRef.current) {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true }
+        });
+        inputCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        outputCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      } else {
+        // Re-use existing context/stream logic if strictly reconnecting
+         micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true }
+        });
+      }
 
       // 5. CONNECT TO GEMINI
-      setHudMessage("ESTABLISHING SECURE UPLINK...");
       const client = getLiveClient();
       
       const waifuInstruction = activeWaifu 
-        ? `IDENTITY: You are ${activeWaifu.name}. PERSONALITY: ${activeWaifu.personality}. You are playing WITH the user.`
-        : `IDENTITY: Tactical HUD AI "Klutch". PERSONALITY: Aggressive Esports Caster.`;
+        ? `IDENTITY: You are ${activeWaifu.name}. PERSONALITY: ${activeWaifu.personality}.`
+        : `IDENTITY: Tactical HUD AI "Klutch". PERSONALITY: Professional Esports Coach & Analyst.`;
 
       const sessionPromise = client.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -115,13 +133,15 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
           outputAudioTranscription: {},
           systemInstruction: `
             ${waifuInstruction}
-            CRITICAL MISSION: You are watching the user's gameplay video stream.
-            1. REACT INSANELY FAST to what you see.
-            2. If you see enemies, shout locations!
-            3. If the user makes a kill, HYPE THEM UP like a caster!
-            4. If the user is idle, give tactical advice for the detected game.
-            5. Do NOT be polite. Be intense, fast, and helpful.
-            6. KEEP RESPONSES SHORT (Under 5 seconds).
+            
+            CORE OBJECTIVE: You are an intelligent Gaming Copilot. You see the user's screen (video) AND hear the user (audio).
+
+            PRIORITY RULES:
+            1. **LISTEN FIRST:** If the user speaks, listens to them and answer intelligently. Do NOT ignore the user. Respond in the same language the user speaks (e.g., Portuguese).
+            2. **WATCH SECOND:** If the user is silent, analyze the gameplay. Give tactical callouts, warn of enemies, or praise kills.
+            3. **BE SMART:** Don't just shout "GO GO GO". Give useful info like "Check that corner", "Reloading", "Heal up", or answer questions like "Where should I go?".
+            4. **CONVERSATIONAL:** You are a partner, not just a hype machine. Be engaging.
+            5. **LANGUAGE:** If the user speaks Portuguese, YOU SPEAK PORTUGUESE.
           `
         },
         callbacks: {
@@ -129,10 +149,13 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
             setStatus('ACTIVE');
             isSessionActiveRef.current = true;
             setHudMessage("SYSTEMS ONLINE");
+            // Setup audio input (mic) to model
             setupAudioProcessor(micStream, sessionPromise);
+            // Setup video input (screen) to model
             startVideoLoop(sessionPromise);
           },
           onmessage: async (msg: LiveServerMessage) => {
+            // Audio Output from Model
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData && outputCtxRef.current) {
                const ctx = outputCtxRef.current;
@@ -152,6 +175,7 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
                setTimeout(() => setVolumeLevel(0), buffer.duration * 1000);
             }
 
+            // Transcriptions
             const transcript = msg.serverContent?.outputTranscription?.text;
             if (transcript) {
               setCaptions(prev => (prev + " " + transcript).slice(-150));
@@ -160,7 +184,10 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
           },
           onclose: () => {
              console.log("Session closed");
-             setStatus('RECONNECTING'); 
+             if (isSessionActiveRef.current) {
+                isSessionActiveRef.current = false;
+                setStatus('RECONNECTING'); 
+             }
           },
           onerror: (err) => {
              console.error(err);
@@ -182,16 +209,23 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
   // --- AUDIO PROCESSING ---
   const setupAudioProcessor = (micStream: MediaStream, sessionPromise: Promise<any>) => {
     if (!inputCtxRef.current) return;
+    
+    // Close old processor if exists
+    try { inputCtxRef.current.close(); } catch(e){}
+    inputCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+
     const source = inputCtxRef.current.createMediaStreamSource(micStream);
     const processor = inputCtxRef.current.createScriptProcessor(4096, 1, 1);
     
     processor.onaudioprocess = (e) => {
-      if (isMuted || !isSessionActiveRef.current) return;
-      const inputData = e.inputBuffer.getChannelData(0);
-      const b64PCM = float32ToB64(inputData);
-      sessionPromise.then(session => {
-        session.sendRealtimeInput({ media: { mimeType: 'audio/pcm;rate=16000', data: b64PCM } });
-      });
+      // Send audio only if not muted and session active
+      if (!isMuted && isSessionActiveRef.current) {
+        const inputData = e.inputBuffer.getChannelData(0);
+        const b64PCM = float32ToB64(inputData);
+        sessionPromise.then(session => {
+          session.sendRealtimeInput({ media: { mimeType: 'audio/pcm;rate=16000', data: b64PCM } });
+        });
+      }
     };
     source.connect(processor);
     processor.connect(inputCtxRef.current.destination);
@@ -199,6 +233,8 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
 
   // --- STABLE VIDEO LOOP (High Frequency) ---
   const startVideoLoop = (sessionPromise: Promise<any>) => {
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+
     const loop = (time: number) => {
       if (!isSessionActiveRef.current) return;
 
@@ -223,22 +259,22 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
             lastFrameTimeRef.current = time;
 
             // --- ULTRA FAST GAME DETECTION (Every 5s) ---
-            if (time - lastGameCheckTimeRef.current > 5000) {
-              detectActiveGame(base64Img).then(async (gameName) => {
-                const prevGame = detectedGameRef.current;
-                
-                // Only update if it's a new, valid game detection
-                if (gameName !== 'Unknown' && gameName !== prevGame) {
-                  setDetectedGame(gameName);
-                  detectedGameRef.current = gameName;
-                  
-                  // Load Dynamic Overlays
-                  const tips = await getTacticalIntel(gameName);
-                  setTacticalTips(tips);
-                }
-                
-                lastGameCheckTimeRef.current = time;
-              });
+            if (time - lastGameCheckTimeRef.current > 5000 && !isDetectingRef.current) {
+              isDetectingRef.current = true;
+              detectActiveGame(base64Img)
+                .then(async (gameName) => {
+                  const prevGame = detectedGameRef.current;
+                  if (gameName !== 'Unknown' && gameName !== prevGame) {
+                    setDetectedGame(gameName);
+                    detectedGameRef.current = gameName;
+                    const tips = await getTacticalIntel(gameName);
+                    setTacticalTips(tips);
+                  }
+                  lastGameCheckTimeRef.current = time;
+                })
+                .finally(() => {
+                  isDetectingRef.current = false;
+                });
             }
           }
         }
@@ -290,7 +326,7 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
 
            <div className="flex flex-col md:flex-row gap-6 justify-center">
              <button 
-               onClick={startOverlaySession}
+               onClick={() => startOverlaySession(false)}
                className="group relative px-10 py-5 bg-primary/10 border border-primary text-primary font-black text-xl uppercase tracking-widest overflow-hidden hover:bg-primary hover:text-black transition-all duration-300 clip-path-polygon"
              >
                <span className="relative z-10 group-hover:translate-x-1 transition-transform inline-block">INITIALIZE</span>
@@ -307,6 +343,18 @@ export const OverlayMode: React.FC<OverlayProps> = ({ onExit, activeWaifu }) => 
         </div>
       </div>
     );
+  }
+
+  // --- RECONNECTING STATE ---
+  if (status === 'RECONNECTING') {
+      return (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center">
+           <div className="text-center animate-pulse">
+              <div className="text-4xl text-red-500 font-bold mb-2">⚠ CONNECTION INTERRUPTED</div>
+              <p className="text-white font-mono">ATTEMPTING AUTO-RECONNECT...</p>
+           </div>
+        </div>
+      );
   }
 
   // --- ACTIVE OVERLAY ---

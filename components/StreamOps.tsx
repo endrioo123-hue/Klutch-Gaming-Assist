@@ -10,6 +10,21 @@ export const StreamOps: React.FC = () => {
     if (channel) setActiveChannel(channel);
   };
 
+  // Twitch requires explicit parent definition for embeds to work
+  const getTwitchEmbedUrl = (channelName: string, type: 'player' | 'chat') => {
+    const hostname = window.location.hostname;
+    // Construct parent params for current host, localhost and 127.0.0.1 to cover dev environments
+    let parents = `parent=${hostname}`;
+    if (hostname !== 'localhost') parents += `&parent=localhost`;
+    if (hostname !== '127.0.0.1') parents += `&parent=127.0.0.1`;
+
+    if (type === 'player') {
+      return `https://player.twitch.tv/?channel=${channelName}&${parents}&muted=false`;
+    } else {
+      return `https://www.twitch.tv/embed/${channelName}/chat?${parents}&darkpopout`;
+    }
+  };
+
   return (
     <div className="h-full flex flex-col p-8 bg-black overflow-hidden">
        <div className="text-center mb-6">
@@ -37,13 +52,15 @@ export const StreamOps: React.FC = () => {
           {activeChannel ? (
             <div className="w-full h-full flex flex-col md:flex-row">
               <iframe
-                src={`https://player.twitch.tv/?channel=${activeChannel}&parent=${window.location.hostname}&parent=localhost`}
+                src={getTwitchEmbedUrl(activeChannel, 'player')}
                 className="flex-1 h-full w-full"
                 allowFullScreen
+                title="Twitch Player"
               ></iframe>
               <iframe
-                src={`https://www.twitch.tv/embed/${activeChannel}/chat?parent=${window.location.hostname}&parent=localhost&darkpopout`}
+                src={getTwitchEmbedUrl(activeChannel, 'chat')}
                 className="w-full md:w-80 h-full hidden md:block border-l border-white/10"
+                title="Twitch Chat"
               ></iframe>
             </div>
           ) : (

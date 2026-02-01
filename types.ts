@@ -11,7 +11,7 @@ export enum AppMode {
   OVERLAY_MODE = 'OVERLAY_MODE',
   PROFILE_HUB = 'PROFILE_HUB',
   SETTINGS = 'SETTINGS',
-  WAIFU_HUB = 'WAIFU_HUB', // New Module
+  WAIFU_HUB = 'WAIFU_HUB',
   STREAM_OPS = 'STREAM_OPS'
 }
 
@@ -41,23 +41,22 @@ export interface GameRecommendation {
   reason: string;
 }
 
-// --- NEW WAIFU / COMPANION TYPES ---
 export interface Waifu {
   id: string;
   name: string;
-  personality: string; // Describes how she talks/acts
-  voiceId: string; // For Gemini Live Config
+  personality: string;
+  voiceId: string;
   avatarUrl: string;
   level: number;
-  intimacy: number; // 0 - 1000
-  traits: string[]; // e.g., "Tsundere", "Tactical", "Sweet"
+  intimacy: number;
+  traits: string[];
 }
 
 export interface ShopItem {
   id: string;
   name: string;
   cost: number;
-  effect: number; // Intimacy gain
+  effect: number;
   icon: string;
   description: string;
 }
@@ -68,8 +67,6 @@ export interface GlobalRankUser {
   xp: number;
   waifuName: string;
 }
-
-// --- EXISTING TYPES UPDATED ---
 
 export interface AvatarTraits {
   gender: string;
@@ -86,6 +83,7 @@ export interface AvatarTraits {
 
 export interface UserStats {
   kills: number;
+  deaths: number;
   wins: number;
   losses: number;
   hoursPlayed: number;
@@ -110,7 +108,10 @@ export interface VoiceConfig {
 export interface UserCustomization {
   isRGBName: boolean;
   avatarBorder: 'none' | 'neon-blue' | 'neon-purple' | 'gold' | 'glitch';
-  themeColor: 'cyan' | 'purple' | 'green' | 'red';
+  themeColor: 'cyan' | 'purple' | 'green' | 'red' | 'gold';
+  avatarIcon: string; // New: Emoji/Icon char
+  bannerId: string; // New: CSS class for background
+  equipTitle: string; // New: Player Title
 }
 
 export interface UserProfile {
@@ -124,7 +125,6 @@ export interface UserProfile {
   customization: UserCustomization;
   rankTitle: string;
   joinedAt: string;
-  // New Fields
   activeWaifuId?: string;
   waifus: Waifu[];
   globalRank?: number;

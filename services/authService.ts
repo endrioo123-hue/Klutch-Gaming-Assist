@@ -39,7 +39,7 @@ export const authService = {
       joinedAt: new Date().toISOString(),
       rankTitle: 'Neophyte',
       stats: { 
-        kills: 0, wins: 0, losses: 0, hoursPlayed: 0, gamesAnalyzed: 0,
+        kills: 0, deaths: 0, wins: 0, losses: 0, hoursPlayed: 0, gamesAnalyzed: 0,
         kdRatio: 0.0,
         headshotPct: 0,
         accuracy: 0 
@@ -52,7 +52,14 @@ export const authService = {
           { id: 'cmd_3', action: 'ASK_AI', phrase: 'Hey Klutch', enabled: true },
         ]
       },
-      customization: { isRGBName: false, avatarBorder: 'none', themeColor: 'cyan' },
+      customization: { 
+        isRGBName: false, 
+        avatarBorder: 'none', 
+        themeColor: 'cyan',
+        avatarIcon: '👾',
+        bannerId: 'default',
+        equipTitle: 'Operative'
+      },
       waifus: []
     };
 
@@ -144,5 +151,82 @@ export const authService = {
         waifuName: activeWaifu ? activeWaifu.name : 'None'
       };
     });
+  },
+
+  // --- INIT BOTS ---
+  initBots() {
+    const users = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
+    if (users.length < 5) {
+      const bots = [
+        { username: 'Nexus_AI', email: 'bot1@klutch.ai', xp: 45000, rankTitle: 'Omniscient', activeWaifuId: 'w1', waifuName: 'Kore' },
+        { username: 'CyberNinja', email: 'bot2@klutch.ai', xp: 28000, rankTitle: 'Titan', activeWaifuId: 'w2', waifuName: 'Yumi' },
+        { username: 'Glitch0', email: 'bot3@klutch.ai', xp: 15000, rankTitle: 'Knight', activeWaifuId: 'w3', waifuName: 'Sarah' },
+        { username: 'Viper', email: 'bot4@klutch.ai', xp: 8000, rankTitle: 'Operative', activeWaifuId: 'w4', waifuName: 'Jinx' },
+        { username: 'Rookie_Bot', email: 'bot5@klutch.ai', xp: 1200, rankTitle: 'Neophyte', activeWaifuId: 'w5', waifuName: 'Bob' },
+      ];
+
+      bots.forEach((bot, i) => {
+        if (!users.some((u: any) => u.username === bot.username)) {
+          const kills = 100 * (i+1);
+          const deaths = Math.floor(kills / 2.5); // Fixed KD approx
+          const newBot: UserAccount = {
+             username: bot.username,
+             email: bot.email,
+             passwordHash: 'bot_secure_hash',
+             level: Math.floor(bot.xp / 1000),
+             xp: bot.xp,
+             credits: 1000,
+             joinedAt: new Date().toISOString(),
+             rankTitle: bot.rankTitle,
+             stats: { 
+               kills, 
+               deaths, 
+               wins: 10 * (i+1), 
+               losses: 5, 
+               hoursPlayed: 100, 
+               gamesAnalyzed: 50, 
+               kdRatio: 2.5, 
+               headshotPct: 45, 
+               accuracy: 60 
+             },
+             voiceSettings: { sensitivity: 50, commands: [] },
+             customization: { 
+               isRGBName: false, 
+               avatarBorder: 'none', 
+               themeColor: 'cyan', 
+               avatarIcon: '🤖', 
+               bannerId: 'default', 
+               equipTitle: 'Bot' 
+             },
+             waifus: [{
+               id: `bot_waifu_${i}`, name: bot.waifuName, personality: 'Bot AI', voiceId: 'Kore', avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${bot.waifuName}`,
+               level: 10, intimacy: 500, traits: []
+             }],
+             activeWaifuId: `bot_waifu_${i}`
+          };
+          users.push(newBot);
+        }
+      });
+      localStorage.setItem(DB_USERS_KEY, JSON.stringify(users));
+    }
+  },
+
+  // --- SIMULATE BOT ACTIVITY ---
+  simulateBotActivity() {
+    const users = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
+    let changed = false;
+    const updatedUsers = users.map((u: UserAccount) => {
+      if (u.email && u.email.includes('@klutch.ai')) {
+         if (Math.random() > 0.5) {
+            u.xp += Math.floor(Math.random() * 500);
+            changed = true;
+         }
+      }
+      return u;
+    });
+
+    if (changed) {
+       localStorage.setItem(DB_USERS_KEY, JSON.stringify(updatedUsers));
+    }
   }
 };
