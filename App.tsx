@@ -100,7 +100,7 @@ const useUserSession = () => {
       credits: 0,
       joinedAt: new Date().toISOString(),
       rankTitle: 'Iniciante',
-      stats: { kills: 0, wins: 0, losses: 0, hoursPlayed: 0, gamesAnalyzed: 0, kdRatio: 0.0, headshotPct: 0, accuracy: 0 },
+      stats: { kills: 0, deaths: 0, wins: 0, losses: 0, hoursPlayed: 0, gamesAnalyzed: 0, kdRatio: 0.0, headshotPct: 0, accuracy: 0 },
       voiceSettings: { sensitivity: 50, commands: [] },
       customization: { 
         isRGBName: false, 
@@ -271,54 +271,4 @@ const App: React.FC = () => {
                onClick={() => setShowProfile(true)}
                className="flex items-center gap-4 cursor-pointer p-1.5 pr-6 rounded-full bg-white/5 hover:bg-white/10 transition-all border border-white/5 hover:border-primary/30 group"
              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-black border border-white/20 text-white flex items-center justify-center font-bold text-lg shadow-lg relative overflow-hidden">
-                   {profile.customization?.avatarIcon || profile.username.charAt(0).toUpperCase()}
-                   <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                </div>
-                <div className="flex flex-col items-start">
-                   <span className="text-sm font-bold text-white group-hover:text-primary transition-colors">{profile.username}</span>
-                   <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-yellow-400 font-mono font-bold">{profile.credits.toLocaleString()} CR</span>
-                      <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
-                      <span className="text-[10px] text-purple-400 font-mono font-bold">LVL {Math.floor(profile.xp / 1000) + 1}</span>
-                   </div>
-                </div>
-             </button>
-         </div>
-      </header>
-
-      {/* MAIN VIEWPORT */}
-      <main className="flex-1 overflow-hidden relative bg-[#050505]">
-         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
-         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary/5 blur-[150px] rounded-full pointer-events-none"></div>
-         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-secondary/5 blur-[150px] rounded-full pointer-events-none"></div>
-         
-         <div className="h-full relative z-10">
-            {mode === AppMode.HOME && <HomeDashboard onNav={setMode} />}
-            
-            {mode !== AppMode.HOME && (
-              <div className="h-full p-0">
-                {mode === AppMode.WAIFU_HUB && <WaifuHub profile={profile} updateProfile={updateProfile} />}
-                {mode === AppMode.TACTICAL_CHAT && <TacticalChat />}
-                {mode === AppMode.LIVE_COMMS && <LiveComms />}
-                {mode === AppMode.ASSET_FORGE && <AssetForge />}
-                {mode === AppMode.NEXUS_VISION && <NexusVision />}
-                {mode === AppMode.GAME_RECOMMENDER && <GameRecommender />}
-                {mode === AppMode.THEORY_CRAFT && <TheoryCraft />}
-                {mode === AppMode.STREAM_OPS && <StreamOps />}
-                {mode === AppMode.SETTINGS && <Subscription />}
-              </div>
-            )}
-         </div>
-      </main>
-
-      {/* Profile Modal */}
-      {showProfile && (
-        <ProfileHub profile={profile} updateProfile={updateProfile} onLogout={handleLogout} onClose={() => setShowProfile(false)} />
-      )}
-
-    </div>
-  );
-};
-
-export default App;
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-black
